@@ -1,4 +1,5 @@
 import requests
+import json
 
 class Ville:
 
@@ -17,15 +18,12 @@ class Ville:
         }
 
     def getCoordinates(self):
-        response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?address={}'.format(self.nom))
-        resp_json_payload = response.json()
-        self.latitude = resp_json_payload['results'][0]['geometry']['location']['lat']
-        self.longitude = resp_json_payload['results'][0]['geometry']['location']['lng']
+        addr = 'https://nominatim.openstreetmap.org/search/{}?format=json&limit=1'.format(self.nom)
+        response = json.loads(requests.get(addr).content)
+        self.latitude = response[0]["lat"]
+        self.longitude = response[0]["lon"]
 
     def getInformations(self):
-        headers = {
-            'User-Agent' : 'Mozilla/5.0',
-        }
         request = requests.get("https://api.breezometer.com/baqi/{0},{1}?key=4d92ed8a496d4ad6b7a85cf9a1f67292&debug=true".format(self.latitude, self.longitude))
         response = request.json()
         self.aqi = response["breezometer_aqi"]
