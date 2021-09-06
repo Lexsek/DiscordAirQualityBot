@@ -5,12 +5,12 @@ import geopandas
 import requests
 import shapely
 import logging
+import aqi
 
 class PurpleSensorLocator:
   def __init__(self):
     logging.info("initializing PurpleSensorLocator")
     self._updated = datetime.fromtimestamp(0)
-    print("hmm...is this being initialized?")
     self.update()
 
   def __str__(self):
@@ -28,7 +28,6 @@ class PurpleSensorLocator:
       df = self._sensors.to_dataframe(sensor_filter='useful', channel='parent')
       self._gdf = geopandas.GeoDataFrame(df, geometry=geopandas.points_from_xy(df.lon, df.lat))
       self._updated = now
-      print("does this ever happen?")
       logging.info("updated PurpleSensorLocator information")
     else:
       logging.info("PurpleSensorLocator is still up to date")
@@ -41,13 +40,13 @@ class PurpleSensorLocator:
     # There will only be one row, really. Return a sensor with this index
     return Sensor(int(rows.index[0]), parse_location=True)
 
-  def nearest_sensors(self, lon, lat, max_dist=10, max_num=5):
+  def nearest_sensors(self, lon, lat, max_dist=50, max_num=5):
     self.update()
     logging.info("finding nearest points to %s, %s" % (lon, lat))
     yielded = 0
     distances = self._gdf.distance(shapely.geometry.Point(lon, lat)).sort_values()
     for sid, dist in distances.iteritems():
-      if yielded > max_num or dist > max_num:
+      if yielded > max_num or dist > max_dist:
         return
       yield Sensor(sid, parse_location=True)
       yielded += 1
@@ -111,30 +110,9 @@ sayings = [
   }
 ]
 
-# Borrowed from http://tech.thejoestory.com/2020/09/air-quality-calculation-purple-air-api.html
-def calcAQ (Cp, Ih, Il, BPh, BPl):
-    a = (Ih - Il)
-    b = (BPh - BPl)
-    c = (Cp - BPl)
-    aq = ((a/b) * c + Il)
-    return aq
 
-def aqi_saying(pm2):
-  if (pm2 > 350.5):
-    aq = calcAQ(pm2, 500, 401, 500, 350.5)
-  elif (pm2 > 250.5):
-    aq = calcAQ(pm2, 400, 301, 350.4, 250.5)
-  elif (pm2 > 150.5):
-    aq = calcAQ(pm2, 300, 201, 250.4, 150.5)
-  elif (pm2 > 55.5):
-    aq = calcAQ(pm2, 200, 151, 150.4, 55.5)
-  elif (pm2 > 35.5):
-    aq = calcAQ(pm2, 150, 101, 55.4, 35.5)
-  elif (pm2 > 12.1):
-    aq = calcAQ(pm2, 100, 51, 35.4, 12.1)
-  elif (pm2 > 0):
-    aq = calcAQ(pm2, 50, 0, 12, 0)
-
+def aqi_saying(pm25):
+  aq = aqi.to_aqi([(aqi.POLLUTANT_PM25, pm25)])
   if aq >= 301:
     saying = sayings[5]
   elif aq >= 201:

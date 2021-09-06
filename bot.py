@@ -2,19 +2,26 @@ import os
 import discord
 from discord.ext import commands
 
-import aqi as aqimod
+import locator
 
 TOKEN=os.getenv("DISCORD_BOT_TOKEN")
 PREFIX=os.getenv("DISCORD_BOT_PREFIX", default="~")
 DEFAULT_CITY=os.getenv("DISCORD_DEFAULT_CITY", default="San Francisco")
 
-purple = aqimod.PurpleSensorLocator()
+purple = locator.PurpleSensorLocator()
 bot = commands.Bot(command_prefix="~")
+
+def mean(lst):
+  try:
+    return sum(lst) / len(lst)
+  except ZeroDivisionError:
+    return -1
+
 
 @bot.command(description="describes the air quality for a location")
 async def aqi(ctx, *where):
   location = " ".join(where) if where else DEFAULT_CITY
-  sensor = purple.nearest_sensor(*aqimod.lookup_streetmap(location))
+  sensor = purple.nearest_sensor(*locator.lookup_streetmap(location))
   template = '''
 Weather information provided by purpleair.com
 ```
@@ -38,7 +45,7 @@ pm2.5: {}
 @bot.command(description="historical data for a location")
 async def aqihist(ctx, *where):
   location = " ".join(where) if where else DEFAULT_CITY
-  sensor = purple.nearest_sensor(*aqimod.lookup_streetmap(location))
+  sensor = purple.nearest_sensor(*locator.lookup_streetmap(location))
   rows = sensor.parent.get_historical(1, "primary")
   template = '''
 ```
@@ -51,18 +58,29 @@ async def aqihist(ctx, *where):
 @bot.command(description="air quality")
 async def air(ctx, *where):
   location = " ".join(where) if where else DEFAULT_CITY
-  lon, lat = aqimod.lookup_streetmap(location)
-  pms = {}
+  lon, lat = locator.lookup_streetmap(location)
+  pm25s = []
+  temps = []
+  humids = []
+  press = []
   for pm in purple.nearest_sensors(lon, lat):
-    pms[pm.location] = pm.parent.current_pm2_5_atm
-  meanaqi = sum(pms.values()) / len(pms)
-  aqi, saying = aqimod.aqi_saying(meanaqi)
+    pm25s.append(pm.parent.current_pm2_5)
+    temps.append(pm.parent.current_temp_f)
+    humids.append(pm.parent.current_humidity)
+    press.append(pm.parent.current_pressure)
+  meanpm25s = mean(pm25s)
+  meanaqi, saying = locator.aqi_saying(meanpm25s)
   template = '''
-```
-PM2.5 for the sensors near you:
-  * {}
 
-Average AQI: {}
+See a map of the area
+https://www.purpleair.com/map?opt=1/mAQI/a10/cC0#12/{}/{}
+
+```
+Average AQI:          {}
+Average PM2.5         {:.2f}
+Average Temperature:  {:.2f} F
+Average Humidity:     {:.2F}
+Average Pressure:     {:.2F}
 
 The air quality is {}.
 
@@ -71,8 +89,13 @@ The air quality is {}.
 '''
 
   await ctx.send(template.format(
-    "\n  * ".join([": ".join([k, str(v)]) for k, v in pms.items()]),
+    lat,
+    lon,
     meanaqi,
+    meanpm25s,
+    mean(temps),
+    mean(humids),
+    mean(press),
     saying.get("quality"),
     "\n  * ".join(saying.get("do")),
   ))
@@ -87,3 +110,4 @@ The air quality is {}.
 #   await ctx.send(purple)
 
 bot.run(TOKEN)
+
