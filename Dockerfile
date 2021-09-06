@@ -1,6 +1,6 @@
 FROM python
 WORKDIR /app
-ENV DISCORD_BOT_TOKEN="unk" 
-COPY . .
+COPY requirements.txt .
 RUN pip install -r requirements.txt
-CMD python pollutionbot.py
+COPY *.py ./
+CMD python bot.py
