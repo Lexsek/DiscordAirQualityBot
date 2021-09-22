@@ -1,0 +1,7 @@
+discord.py
+tabulate
+requests
+geopandas
+pandas
+purpleair
+python-aqi
